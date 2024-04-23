@@ -6,6 +6,7 @@ import { CommandBus } from '@nestjs/cqrs';
 import BankTransaction from '@context/transaction/domain/class/BankTransaction';
 import UpdateTransactionStatusCommand from '@context/transaction/domain/class/command/UpdateTransactionStatusCommand';
 import { UpdateTransactionDomainEvent } from '@context/transaction/domain/class/events/UpdateTransactionDomainEvent';
+import { TransactionState } from '@context/transaction/domain/constants/TransactionState';
 
 @Injectable()
 export class KafkaHandler {
@@ -34,9 +35,10 @@ export class KafkaHandler {
           console.log(`Kafka consumer <${topic}> =>> ${message.value}`);
           if (UpdateTransactionDomainEvent.EVENT_NAME === topic) {
             const { transaction } = JSON.parse(message.value!.toString());
+            console.log('TRNSACTION >> ', transaction);
             const command = UpdateTransactionStatusCommand.create(
               transaction.id,
-              transaction.status,
+              transaction.newStatus as TransactionState,
             );
             this.commandBus.execute(command);
           }

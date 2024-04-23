@@ -14,7 +14,7 @@ export class ConsumerService implements OnApplicationShutdown {
   async consume(topics: ConsumerSubscribeTopics, conf: ConsumerRunConfig) {
     const kafka = new Kafka({
       brokers: [config.KAFKA.BROKER as string],
-      clientId: 'yape-client',
+      clientId: config.KAFKA.CLIENT_ID,
       retry: {
         retries: Number(config.KAFKA.MAX_RETRIES)
       },

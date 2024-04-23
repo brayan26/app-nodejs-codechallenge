@@ -11,7 +11,7 @@ export class ProducerService implements OnModuleInit, OnApplicationShutdown {
   // Connect to Kafka Server
   private readonly kafka = new Kafka({
     brokers: [config.KAFKA.BROKER as string],
-    clientId: 'yape-client',
+    clientId: config.KAFKA.CLIENT_ID,
     requestTimeout: 3000,
     retry: {
       retries: Number(config.KAFKA.MAX_RETRIES)

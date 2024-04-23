@@ -36,7 +36,7 @@ export default class TransactionRepositoryWriteMongo
   async update(id: string, status: TransactionState): Promise<void> {
     const collection = await this.collection();
     collection.updateOne(
-      { _id: id },
+      { _id: new ObjectId(id) },
       { $set: { status, updateAt: new Date() } },
       { upsert: true },
     );
