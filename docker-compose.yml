@@ -1,25 +1,98 @@
-version: "3.7"
 services:
-  postgres:
-    image: postgres:14
+  mongodb_write:
+    image: mongo
+    container_name: mongodb_write
     ports:
-      - "5432:5432"
+      - "27017:27017"
+    volumes:
+      - mongodb_write_data:/data/db
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    networks:
+      - app_network
+  mongodb_read:
+    image: mongo
+    container_name: mongodb_read
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodb_read_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password    
+    networks:
+      - app_network
   zookeeper:
     image: confluentinc/cp-zookeeper:5.5.3
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181", "|", "grep", "imok"]
+      interval: 40s
+      timeout: 20s
+      retries: 3
+    networks:
+      - app_network
   kafka:
     image: confluentinc/cp-enterprise-kafka:5.5.3
     depends_on: [zookeeper]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "kafka-broker-api-versions --bootstrap-server=kafka:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
     environment:
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://kafka:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_BROKER_ID: 1
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_JMX_PORT: 9991
     ports:
-      - 9092:9092
+      - "9092:9092"
+    networks:
+      - app_network
+  command_after_start:
+    image: confluentinc/cp-enterprise-kafka:5.5.3
+    depends_on: [kafka]
+    volumes:
+      - ./init.sh:/init.sh
+    command: ["sh", "-c", "ls -a && chmod +x /init.sh && /init.sh"]
+    networks:
+      - app_network
+  ms-transaction:
+    build: ./ms-transaction
+    container_name: ms-transaction
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongodb_write
+      - mongodb_read
+      - kafka
+      - command_after_start
+    env_file:
+      - ./ms-transaction/.env
+    networks:
+      - app_network
+  ms-anti-fraud:
+    build: ./ms-anti-fraud
+    container_name: ms-anti-fraud
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongodb_read
+      - kafka
+      - command_after_start
+    env_file:
+      - ./ms-anti-fraud/.env
+    networks:
+      - app_network    
+volumes:
+  mongodb_write_data:
+    name: mongodb_write_data
+  mongodb_read_data:
+    name: mongodb_read_data
+networks:
+  app_network:
+    driver: bridge
